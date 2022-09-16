@@ -680,7 +680,7 @@ int main(int argc, char** argv)
     nh.param<bool>("pcd_save_enable", pcd_save_en, 0);
     nh.param<vector<double>>("mapping/extrinsic_T", extrinT, vector<double>());
     nh.param<vector<double>>("mapping/extrinsic_R", extrinR, vector<double>());
-    cout<<"p_pre->lidar_type "<<p_pre->lidar_type<<endl;
+    ROS_INFO_STREAM("p_pre->lidar_type "<<p_pre->lidar_type);
     
     path.header.stamp    = ros::Time::now();
     path.header.frame_id ="camera_init";
