@@ -135,8 +135,8 @@ nav_msgs::Odometry odomAftMapped;
 geometry_msgs::Quaternion geoQuat;
 geometry_msgs::PoseStamped msg_body_pose;
 
-shared_ptr<Preprocess> p_pre(new Preprocess());
-shared_ptr<ImuProcess> p_imu(new ImuProcess());
+shared_ptr<Preprocess> p_pre;
+shared_ptr<ImuProcess> p_imu;
 
 void SigHandle(int sig)
 {
@@ -330,6 +330,8 @@ void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in)
 bool sync_packages(MeasureGroup &meas)
 {
     if (lidar_buffer.empty() || imu_buffer.empty()) {
+        // ROS_WARN_STREAM_COND(lidar_buffer.empty(), "lidar buffer is empty!");
+        // ROS_WARN_STREAM_COND(imu_buffer.empty(), "imu buffer is empty!");
         return false;
     }
 
@@ -343,12 +345,22 @@ bool sync_packages(MeasureGroup &meas)
             return false;
         }
         meas.lidar_beg_time = time_buffer.front();
-        lidar_end_time = meas.lidar_beg_time + meas.lidar->points.back().curvature / double(1000);
+        if(p_pre->lidar_type == D455)
+        {
+            lidar_end_time = meas.lidar_beg_time;
+        }
+        else
+        {
+            lidar_end_time = meas.lidar_beg_time + meas.lidar->points.back().curvature / double(1000);
+        }
+        
+        
         lidar_pushed = true;
     }
 
     if (last_timestamp_imu < lidar_end_time)
     {
+        ROS_WARN_STREAM("last_timestamp_imu < lidar_end_time "<<last_timestamp_imu<<" "<<lidar_end_time);
         return false;
     }
 
@@ -362,7 +374,8 @@ bool sync_packages(MeasureGroup &meas)
         meas.imu.push_back(imu_buffer.front());
         imu_buffer.pop_front();
     }
-
+    ROS_INFO_STREAM("meas.imu size: "<<meas.imu.size());
+    ROS_INFO_STREAM("meas.lidar size: "<<meas.lidar->size());
     lidar_buffer.pop_front();
     time_buffer.pop_front();
     lidar_pushed = false;
@@ -655,7 +668,8 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "laserMapping");
     ros::NodeHandle nh;
-
+    p_pre.reset(new Preprocess(nh));
+    p_imu.reset(new ImuProcess(nh));
     nh.param<bool>("dense_map_enable",dense_map_en,1);
     nh.param<int>("max_iteration",NUM_MAX_ITERATIONS,4);
     nh.param<string>("map_file_path",map_file_path,"");
@@ -680,8 +694,11 @@ int main(int argc, char** argv)
     nh.param<bool>("pcd_save_enable", pcd_save_en, 0);
     nh.param<vector<double>>("mapping/extrinsic_T", extrinT, vector<double>());
     nh.param<vector<double>>("mapping/extrinsic_R", extrinR, vector<double>());
-    ROS_INFO_STREAM("p_pre->lidar_type "<<p_pre->lidar_type);
-    
+    ROS_INFO_STREAM("lid_topic "<<lid_topic);
+    ROS_INFO_STREAM("imu_topic "<<imu_topic);
+    ROS_INFO_STREAM("filter_size_corner_min "<<filter_size_corner_min);
+    ROS_INFO_STREAM("filter_size_surf_min "<<filter_size_surf_min);
+    p_imu->set_lidar_type(static_cast<LID_TYPE>(p_pre->lidar_type));
     path.header.stamp    = ros::Time::now();
     path.header.frame_id ="camera_init";
 
@@ -752,10 +769,10 @@ int main(int argc, char** argv)
         if (flg_exit) break;
         ros::spinOnce();
         if(sync_packages(Measures)) 
-        {
+        {   
             if (flg_reset)
             {
-                ROS_WARN("reset when rosbag play back");
+                ROS_WARN_STREAM("reset when rosbag play back");
                 p_imu->Reset();
                 flg_reset = false;
                 continue;
@@ -772,6 +789,7 @@ int main(int argc, char** argv)
 
             p_imu->Process(Measures, kf, feats_undistort);
             state_point = kf.get_x();
+            ROS_INFO_STREAM("state_point: "<<state_point.pos.transpose());
             pos_lid = state_point.pos + state_point.rot * state_point.offset_T_L_I;
 
             if (feats_undistort->empty() || (feats_undistort == NULL))
@@ -790,8 +808,10 @@ int main(int argc, char** argv)
             /*** downsample the feature points in a scan ***/
             downSizeFilterSurf.setInputCloud(feats_undistort);
             downSizeFilterSurf.filter(*feats_down_body);
+            
             t1 = omp_get_wtime();
             feats_down_size = feats_down_body->points.size();
+            ROS_INFO_STREAM("feats_down_body size: "<<feats_down_size);
             /*** initialize the map kdtree ***/
             if(ikdtree.Root_Node == nullptr)
             {
@@ -820,7 +840,7 @@ int main(int argc, char** argv)
             fout_pre<<setw(20)<<Measures.lidar_beg_time - first_lidar_time<<" "<<euler_cur.transpose()<<" "<< state_point.pos.transpose()<<" "<<ext_euler.transpose() << " "<<state_point.offset_T_L_I.transpose()<< " " << state_point.vel.transpose() \
             <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<< endl;
 
-            if(0) // If you need to see map point, change to "if(1)"
+            if(1) // If you need to see map point, change to "if(1)"
             {
                 PointVector ().swap(ikdtree.PCL_Storage);
                 ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage, NOT_RECORD);

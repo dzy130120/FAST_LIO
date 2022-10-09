@@ -1,9 +1,9 @@
 common:
-    lid_topic:  "/d455/pt"
-    imu_topic:  "/d455/imu"
+    lid_topic:  "/camera/depth/color/points"
+    imu_topic:  "/camera/imu"
 
 preprocess:
-    lidar_type: 4                # 1 for Livox serials LiDAR, 2 for Velodyne LiDAR, 3 for ouster LiDAR, 
+    lidar_type: 4                # 1 for Livox serials LiDAR, 2 for Velodyne LiDAR, 3 for ouster LiDAR, 4 for realsense d455
     scan_line: 480
     blind: 4
 
@@ -14,7 +14,7 @@ mapping:
     b_gyr_cov: 0.0001
     fov_degree:    90
     det_range:     5.0
-    extrinsic_T: [ 0.03022,-0.0074,-0.01602 ]
+    extrinsic_T: [ 0.030, -0.007, -0.016 ] # T_L_I
     extrinsic_R: [ 1, 0, 0,
                    0, 1, 0,
                    0, 0, 1]

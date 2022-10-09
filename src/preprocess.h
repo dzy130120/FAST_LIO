@@ -1,3 +1,4 @@
+#pragma once
 #include <ros/ros.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -54,6 +55,7 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(velodyne_ros::Point,
 namespace D455_ros {
   struct EIGEN_ALIGN16 Point {
       PCL_ADD_POINT4D;
+      float rgb;
       uint32_t t;
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   };
@@ -62,6 +64,7 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(D455_ros::Point,
     (float, x, x)
     (float, y, y)
     (float, z, z)
+    (float, rgb, rgb)
     (uint32_t, t, t)
 )
 
@@ -97,7 +100,7 @@ class Preprocess
   public:
 //   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  Preprocess();
+  Preprocess(ros::NodeHandle nh_);
   ~Preprocess();
   
   void process(const livox_ros_driver::CustomMsg::ConstPtr &msg, PointCloudXYZI::Ptr &pcl_out);
@@ -120,7 +123,7 @@ class Preprocess
   void velodyne_handler(const sensor_msgs::PointCloud2::ConstPtr &msg);
   void d455_handler(const sensor_msgs::PointCloud2::ConstPtr &msg);
   void give_feature(PointCloudXYZI &pl, vector<orgtype> &types);
-  void pub_func(PointCloudXYZI &pl, const ros::Time &ct);
+  void pub_func(PointCloudXYZI &pl, ros::Publisher& publisher,const ros::Time &ct);
   int  plane_judge(const PointCloudXYZI &pl, vector<orgtype> &types, uint i, uint &i_nex, Eigen::Vector3d &curr_direct);
   bool small_plane(const PointCloudXYZI &pl, vector<orgtype> &types, uint i_cur, uint &i_nex, Eigen::Vector3d &curr_direct);
   bool edge_jump_judge(const PointCloudXYZI &pl, vector<orgtype> &types, uint i, Surround nor_dir);
@@ -134,4 +137,5 @@ class Preprocess
   double edgea, edgeb;
   double smallp_intersect, smallp_ratio;
   double vx, vy, vz;
+  ros::NodeHandle nh;
 };
